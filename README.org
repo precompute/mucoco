@@ -1,0 +1,1 @@
+* MuCoCo - Multiple Compile Commands

@@ -5,9 +5,9 @@
 ;; Author: precompute <git@precompute.net>
 ;; URL: https://github.com/precompute/mucoco
 ;; Created: February 2, 2025
-;; Modified: February 2, 2025
-;; Version: 0.0.2
-;; Package-Requires: ((emacs "26.1") (evil "1.2.10"))
+;; Modified: June 23, 2025
+;; Version: 0.0.5
+;; Package-Requires:
 
 ;; MuCoCo.el -- Multiple Compile Commands
 
@@ -30,35 +30,69 @@
 ;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 ;;; Commentary:
+;; MuCoCo shows a list of multiple compile commands in a transient.
+;; It also allows defining mode-specific compile commands.
+
 ;;; Code:
 ;;;; Variables
-(defcustom mucoco-list
-  "List of plists with mucoco definitions."
-  :type 'list
-  :group 'evil-lispops)
+(defcustom mucoco-commands nil
+  "Commands for MuCoCo."
+  :type 'sexp :group 'mucoco)
 
 ;;;; Functions
-(defun mucoco-get-plist-with-member (key val &optional plistlist)
-  "Return plist with member KEY VAL from PLISTLIST."
-  (interactive)
-  (let ((plistlist (or plistlist mucoco-list)))
-   (while (and plistlist
-               (not (equal val (plist-get (car plistlist) key))))
-     (setq plistlist (cdr plistlist)))
-   (car plistlist)))
+(defun mucoco--compile (command)
+  "Run `compile’ for COMMAND."
+  (compile command))
 
-(defun mucoco-resolve-plist (plist &optional plistlist)
-  (let* ((plistlist (or plistlist mucoco-list))
-         (template (plist-get plist :template))
-         (plist (if template
-                    (map-delete plist :template) ;; map-delete deletes *all* instances of KEY
-                  plist))
-         (plist0 (if template
-                     (mucoco-get-plist-with-member :name template plistlist)
-                   nil))
-         (join-plists (lambda (x y) (map-merge-with 'plist #'(lambda (a b) a) x y))))
-    (if (and template plist0)
-        (mucoco-resolve-plist (funcall join-plists plist plist0) plistlist)
-      plist)))
+;;;;; Transient
+;;;;;; Helper Functions
+;;;;;;; Compile Command
+(defun mucoco--compile-command-empty ()
+  "Check whether `compile-coammnd’ is nil."
+  (null compile-command))
+
+;;;;;;; Compile History
+(defun mucoco--compile-history-empty ()
+  "Check whether `compile-history’ is nil."
+  (null compile-history))
+
+(defun mucoco--compile-history-transient-generator ()
+  "Generates transient forms for the `compile-history’ varible."
+  (when (not (mucoco--compile-history-empty))
+    (mapcar (lambda (z)
+              (let ((c (nth z compile-history))
+                    (k (char-to-string (+ ?a z))))
+                (list k c (lambda () (interactive) (mucoco--compile c)))))
+            (number-sequence 0 (1- (length compile-history))))))
+
+;;;;;;; Mucoco Commands
+(defun mucoco--mucoco-commands-empty ()
+  "Check whether `mucoco-commands’ is empty."
+  (null mucoco-commands))
+
+(defun mucoco--mucoco-commands-transient-generator ()
+  "Generates transient forms for the `mucoco-commands’ varible."
+  (when (not (mucoco--mucoco-commands-empty))
+    (mapcar (lambda (z)
+              (let ((c (nth z mucoco-commands))
+                    (k (char-to-string (+ ?a z))))
+                (list k c (lambda () (interactive) (mucoco--compile c)))))
+            (number-sequence 0 (1- (length mucoco-commands))))))
+
+;;;;;; Transient
+(transient-define-prefix mucoco ()
+  "Transient for MuCoCo."
+  :transient-suffix     'transient--do-stay
+  :transient-non-suffix 'transient--do-warn
+  ["compile-history" :if-not mucoco--compile-history-empty
+   :setup-children
+   (lambda (_) (transient-parse-suffixes 'transient--prefix
+                                         (mucoco--compile-history-transient-generator)))]
+  ["compile-command" :if-not mucoco--compile-command-empty
+   ("CC" (lambda () (format "%s" compile-command)) compile)]
+  ["mucoco-commands" :if-not mucoco--mucoco-commands-empty
+   :setup-children
+   (lambda (_) (transient-parse-suffixes 'transient--prefix
+                                         (mucoco--mucoco-commands-transient-generator)))])
 
 ;;; mucoco.el ends here

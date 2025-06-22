@@ -1,1 +1,2 @@
 * MuCoCo - Multiple Compile Commands
+#+HTML: <img src="header.webp" align="center">

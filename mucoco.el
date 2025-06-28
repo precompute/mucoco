@@ -34,6 +34,8 @@
 ;; It also allows defining mode-specific compile commands.
 
 ;;; Code:
+(require 'transient)
+
 ;;;; Variables
 (defcustom mucoco-commands nil
   "Commands for MuCoCo."
@@ -60,9 +62,10 @@
   "Generates transient forms for the `compile-history’ varible."
   (when (not (mucoco--compile-history-empty))
     (mapcar (lambda (z)
-              (let ((c (nth z compile-history))
-                    (k (char-to-string (+ ?a z))))
-                (list k c (lambda () (interactive) (mucoco--compile c)))))
+              (let* ((c (nth z compile-history))
+                     (c-trim (replace-regexp-in-string "\n+$" "" c))
+                     (k (char-to-string (+ ?a z))))
+                (list k c-trim (lambda () (interactive) (mucoco--compile c)))))
             (number-sequence 0 (1- (length compile-history))))))
 
 ;;;;;;; Mucoco Commands
@@ -95,4 +98,5 @@
    (lambda (_) (transient-parse-suffixes 'transient--prefix
                                          (mucoco--mucoco-commands-transient-generator)))])
 
+(provide 'mucoco)
 ;;; mucoco.el ends here
